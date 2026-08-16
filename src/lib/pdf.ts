@@ -9,7 +9,16 @@ import { calculateQuote, formatBRL, type QuoteInput } from "./pricing";
 const NAVY = "#040491";
 const MUTED = "#6b7280";
 
-export async function generateQuotePdf(input: QuoteInput): Promise<Buffer> {
+export type PdfAudience = "client" | "internal";
+
+function row(doc: PDFKit.PDFDocument, label: string, value: string, opts?: { bold?: boolean; color?: string }) {
+  doc.fontSize(11).font(opts?.bold ? "Helvetica-Bold" : "Helvetica").fillColor(opts?.color ?? "#111827");
+  doc.text(label, 50, doc.y, { continued: true, width: 350 });
+  doc.text(value, { align: "right" });
+  doc.moveDown(0.5);
+}
+
+export async function generateQuotePdf(input: QuoteInput, audience: PdfAudience = "client"): Promise<Buffer> {
   const breakdown = calculateQuote(input);
 
   return new Promise((resolve, reject) => {
@@ -34,37 +43,45 @@ export async function generateQuotePdf(input: QuoteInput): Promise<Buffer> {
       doc.moveDown(0.8);
     }
 
-    doc.fillColor("#111827").fontSize(11).font("Helvetica-Bold").text("Material: ", { continued: true });
-    doc.font("Helvetica").text(`${input.materialName} (${input.filamentGrams}g a ${formatBRL(input.filamentPricePerKg)}/kg)`);
-    doc.moveDown(1.2);
+    if (audience === "internal") {
+      doc.fillColor("#111827").fontSize(11).font("Helvetica-Bold").text("Material: ", { continued: true });
+      doc.font("Helvetica").text(`${input.materialName} (${input.filamentGrams}g a ${formatBRL(input.filamentPricePerKg)}/kg)`);
+      doc.moveDown(1.2);
 
-    function row(label: string, value: string, opts?: { bold?: boolean; color?: string }) {
-      doc.fontSize(11).font(opts?.bold ? "Helvetica-Bold" : "Helvetica").fillColor(opts?.color ?? "#111827");
-      doc.text(label, 50, doc.y, { continued: true, width: 350 });
-      doc.text(value, { align: "right" });
+      row(doc, "Custo de filamento", formatBRL(breakdown.filamentCost));
+      row(doc, "Custo de energia", formatBRL(breakdown.energyCost));
+      if (breakdown.laborCost > 0) row(doc, "Mão de obra", formatBRL(breakdown.laborCost));
+      if (breakdown.depreciationCost > 0) row(doc, "Depreciação", formatBRL(breakdown.depreciationCost));
+      if (breakdown.fixedCosts > 0) row(doc, "Custos fixos", formatBRL(breakdown.fixedCosts));
+
+      doc.moveDown(0.3);
+      doc.strokeColor("#e5e7eb").moveTo(50, doc.y).lineTo(545, doc.y).stroke();
       doc.moveDown(0.5);
+
+      row(doc, "Subtotal", formatBRL(breakdown.subtotal), { color: MUTED });
+      if (breakdown.profitMarginPercent > 0) {
+        row(doc, `Margem de lucro (${breakdown.profitMarginPercent}%)`, formatBRL(breakdown.profitAmount), { color: MUTED });
+      }
+
+      doc.moveDown(0.5);
+      doc.strokeColor(NAVY).lineWidth(1.5).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
+      doc.moveDown(0.5);
+
+      row(doc, "Total", formatBRL(breakdown.total), { bold: true, color: NAVY });
+    } else {
+      // Orçamento pro cliente: só a descrição da peça e o valor final — nenhuma linha de
+      // custo (filamento, energia, mão de obra, margem) chega no PDF que sai da empresa.
+      doc.fillColor("#111827").fontSize(11).font("Helvetica-Bold").text("Peça: ", { continued: true });
+      doc.font("Helvetica").text(`${input.materialName}, ${input.filamentGrams}g - ${input.printHours}h de impressão`);
+      doc.moveDown(1.5);
+
+      doc.strokeColor(NAVY).lineWidth(1.5).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
+      doc.moveDown(0.6);
+      doc.fontSize(13).font("Helvetica-Bold").fillColor("#111827").text("Valor do orçamento", 50, doc.y, { continued: true, width: 350 });
+      doc.fontSize(18).fillColor(NAVY).text(formatBRL(breakdown.total), { align: "right" });
+      doc.moveDown(0.6);
+      doc.strokeColor(NAVY).lineWidth(1.5).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
     }
-
-    row("Custo de filamento", formatBRL(breakdown.filamentCost));
-    row("Custo de energia", formatBRL(breakdown.energyCost));
-    if (breakdown.laborCost > 0) row("Mão de obra", formatBRL(breakdown.laborCost));
-    if (breakdown.depreciationCost > 0) row("Depreciação", formatBRL(breakdown.depreciationCost));
-    if (breakdown.fixedCosts > 0) row("Custos fixos", formatBRL(breakdown.fixedCosts));
-
-    doc.moveDown(0.3);
-    doc.strokeColor("#e5e7eb").moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-    doc.moveDown(0.5);
-
-    row("Subtotal", formatBRL(breakdown.subtotal), { color: MUTED });
-    if (breakdown.profitMarginPercent > 0) {
-      row(`Margem de lucro (${breakdown.profitMarginPercent}%)`, formatBRL(breakdown.profitAmount), { color: MUTED });
-    }
-
-    doc.moveDown(0.5);
-    doc.strokeColor(NAVY).lineWidth(1.5).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-    doc.moveDown(0.5);
-
-    row("Total", formatBRL(breakdown.total), { bold: true, color: NAVY });
 
     if (input.notes) {
       doc.moveDown(1.5);

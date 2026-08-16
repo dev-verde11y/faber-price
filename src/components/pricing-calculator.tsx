@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Calculator, FileDown, Eraser, Layers, Zap, SlidersHorizontal } from "lucide-react";
+import { Loader2, Calculator, FileDown, Eraser, Layers, Zap, SlidersHorizontal, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { CostBreakdownChart } from "./cost-breakdown-chart";
 import { calculateQuote, formatBRL, type QuoteBreakdown } from "@/lib/pricing";
 import type { Printer, EnergyFlag, MaterialPreset } from "@/lib/presets";
@@ -40,6 +41,9 @@ export function PricingCalculator({ printers, energyFlags, materials }: Props) {
   const [breakdown, setBreakdown] = useState<QuoteBreakdown | null>(null);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [error, setError] = useState("");
+  // Padrão oculta os custos — o PDF sai pronto pra mandar pro cliente sem vazar
+  // margem/composição de preço. Desligar é uma escolha explícita pra uso interno.
+  const [hideCostsInPdf, setHideCostsInPdf] = useState(true);
 
   function update(field: keyof typeof form) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -81,11 +85,12 @@ export function PricingCalculator({ printers, energyFlags, materials }: Props) {
   async function handleGeneratePdf() {
     setGeneratingPdf(true);
     setError("");
+    const audience = hideCostsInPdf ? "client" : "internal";
     try {
       const res = await fetch("/api/quote-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildQuoteInput()),
+        body: JSON.stringify({ ...buildQuoteInput(), audience }),
       });
       if (!res.ok) {
         setError("Erro ao gerar o PDF.");
@@ -95,7 +100,7 @@ export function PricingCalculator({ printers, energyFlags, materials }: Props) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "orcamento-faber-price.pdf";
+      a.download = audience === "internal" ? "relatorio-interno-faber-price.pdf" : "orcamento-faber-price.pdf";
       a.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -282,9 +287,17 @@ export function PricingCalculator({ printers, energyFlags, materials }: Props) {
               <Row label="Total" value={formatBRL(breakdown.total)} bold />
             </div>
 
-            <Button variant="outline" size="sm" onClick={handleGeneratePdf} disabled={generatingPdf} className="w-full mt-2">
+            <div className="flex items-center justify-between gap-2 rounded-lg border bg-background px-3 py-2 mt-2">
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <EyeOff className="size-3.5" />
+                Ocultar custos no PDF (orçamento pro cliente)
+              </span>
+              <Switch checked={hideCostsInPdf} onCheckedChange={setHideCostsInPdf} />
+            </div>
+
+            <Button variant="outline" size="sm" onClick={handleGeneratePdf} disabled={generatingPdf} className="w-full">
               {generatingPdf ? <Loader2 className="size-4 animate-spin" /> : <FileDown className="size-4" />}
-              Gerar orçamento em PDF
+              {hideCostsInPdf ? "Gerar orçamento pro cliente" : "Gerar relatório interno (com custos)"}
             </Button>
           </div>
 
