@@ -33,6 +33,7 @@ export const DEFAULT_PRESETS: PresetsState = {
     { id: "printer-ender3", name: "Ender 3", watts: 220 },
     { id: "printer-prusa-mk4", name: "Prusa MK4", watts: 120 },
     { id: "printer-bambu-p1s", name: "Bambu Lab P1S", watts: 350 },
+    { id: "printer-kobra-x", name: "Kobra X", watts: 300 },
   ],
   energyFlags: [
     { id: "flag-verde", name: "Bandeira verde", pricePerKwh: 0.65 },
