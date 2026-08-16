@@ -1,36 +1,34 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FABER Price
 
-## Getting Started
+Calculadora de precificação de impressão 3D — versão standalone, sem banco de dados e sem
+login. Extraída de `/admin/precificacao` do `faber-web`, pensada como produto à parte
+(replicável/white-label), enquanto o deploy da plataforma principal (`faber-api` + `faber-web`)
+ainda não acontece.
 
-First, run the development server:
+## Como funciona
+
+- **Cálculo de custo** (filamento, energia, mão de obra, depreciação, custos fixos, margem de
+  lucro) roda 100% no navegador — `src/lib/pricing.ts`, função pura, sem I/O.
+- **Presets** (impressoras, bandeiras tarifárias, materiais de referência usados nos botões
+  rápidos da calculadora) ficam salvos no `localStorage` do navegador (`src/lib/presets.ts` +
+  `src/hooks/use-presets.ts`) — sem conta, sem sincronizar entre dispositivos.
+- **PDF do orçamento** é a única coisa que passa pelo servidor: `POST /api/quote-pdf`
+  (`src/app/api/quote-pdf/route.ts`) gera o PDF com `pdfkit` e devolve o arquivo — não persiste
+  nada, só processa e responde.
+- Reaproveita a identidade visual do FABER (tema, tipografia Plus Jakarta Sans/Syne, componentes
+  shadcn/ui "new-york") — ver `src/app/globals.css`.
+
+## Rodando localmente
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Sobe em [http://localhost:3001](http://localhost:3001) (porta 3001 pra não conflitar com o
+`faber-web`, que usa a 3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deploy
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Projeto standalone, sem dependência de banco de dados nem de variáveis de ambiente — dá pra
+deployar na Vercel (free tier) sem nenhuma configuração extra além do repositório.
